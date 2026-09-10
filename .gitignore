@@ -37,3 +37,13 @@ volumes/
 
 ### Runtime logs ###
 *.log
+logs/
+rag/logs/
+
+### Runtime session / editor local data (may contain personal or machine-local info) ###
+sessions/
+.obsidian/
+.trae-html-share-packages/
+
+### Debug leftover ###
+rag/query.json

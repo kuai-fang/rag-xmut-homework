@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 不引入 Spring Boot 默认 base.xml 的控制台 appender（其 charset 跟随系统 GBK，导致中文乱码），
+         改为自定义、统一 UTF-8 输出。 -->
+
+    <!-- 从 application.properties 读取保留天数，默认 30 -->
+    <springProperty scope="context" name="ragRetentionDays" source="rag.log.retention-days"
+                    defaultValue="30"/>
+
+    <property name="PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+
+    <!-- 控制台：强制 UTF-8，与 IDEA 终端（已设 UTF-8）对齐 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 默认应用日志文件（可选，兜底所有业务日志） -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/spring.log</file>
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/spring-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 独立归集 RAG 检索日志：UTF-8、按天滚动、保留 N 天 -->
+    <appender name="RAG_RETRIEVAL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/rag-retrieval-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${ragRetentionDays}</maxHistory>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+    </appender>
+
+    <logger name="com.wuyunbin.rag" level="debug">
+        <appender-ref ref="RAG_RETRIEVAL"/>
+    </logger>
+
+    <root level="info">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>
