@@ -47,3 +47,15 @@ sessions/
 
 ### Debug leftover ###
 rag/query.json
+
+### Course-private / transient runtime artifacts — keep out of VCS ###
+rag/store_dump.json
+rag/optimize_cache.json
+rag/_testlog.txt
+rag/_app*.log
+rag/store_check.py
+rag/milvus_direct.py
+rag/verify_content.py
+rag/embed_check.py
+rag/probe_judge.py
+rag/speedtest_one.py

@@ -47,6 +47,14 @@ public class ChatService {
     @Value("${rag.log.max-content-chars:100000}")
     private int maxContentChars = 100_000;
 
+    /** RAG 检索默认返回条数（本机寻优最优组合 topK=3）。 */
+    @Value("${rag.retrieve.topk:3}")
+    private int defaultTopK = 3;
+
+    /** RAG 检索默认相似度阈值（本机寻优最优组合 0.6）。 */
+    @Value("${rag.retrieve.similarity-threshold:0.6}")
+    private double defaultSimilarityThreshold = 0.6;
+
     /**
      * 多轮问答：可选结合知识库检索 + 会话记忆。
      *
@@ -56,7 +64,7 @@ public class ChatService {
     public ChatResponse chat(ChatRequest request) {
         String sessionId = resolveSessionId(request.sessionId());
         boolean rag = request.isRagEnabledOrDefault();
-        int topK = request.resolvedTopK();
+        int topK = request.topK() == null ? defaultTopK : request.resolvedTopK();
 
         log.debug("[chat][{}] 收到请求  ragEnabled={} topK={} message={}",
                 sessionId, rag, topK, request.message());
@@ -65,7 +73,9 @@ public class ChatService {
         String systemContext = null;
         if (rag) {
             long t0 = System.currentTimeMillis();
-            sources = ragKnowledgeService.search(request.message(), topK);
+            double threshold = request.similarityThreshold() != null
+                    ? request.similarityThreshold() : defaultSimilarityThreshold;
+            sources = ragKnowledgeService.search(request.message(), topK, threshold);
             long costMs = System.currentTimeMillis() - t0;
             logRetrieval(sessionId, request.message(), sources, costMs);
 

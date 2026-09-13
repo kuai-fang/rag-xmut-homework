@@ -31,6 +31,14 @@ public class RagController {
     @Value("${spring.ai.vectorstore.milvus.collection-name}")
     private String collectionName;
 
+    /** RAG 检索默认返回条数（本机寻优最优组合 topK=3）。 */
+    @Value("${rag.retrieve.topk:3}")
+    private int defaultTopK = 3;
+
+    /** RAG 检索默认相似度阈值（本机寻优最优组合 0.6）。 */
+    @Value("${rag.retrieve.similarity-threshold:0.6}")
+    private double defaultSimilarityThreshold = 0.6;
+
     public RagController(RagKnowledgeService ragKnowledgeService, MilvusQueryService milvusQueryService) {
         this.ragKnowledgeService = ragKnowledgeService;
         this.milvusQueryService = milvusQueryService;
@@ -43,11 +51,19 @@ public class RagController {
         return ragKnowledgeService.importDocument(filePath);
     }
 
+    @PostMapping("/clear")
+    @Operation(summary = "清空知识库集合", description = "删除整个 Milvus 集合，用于全量重建前的重置")
+    public String clearCollection() {
+        return ragKnowledgeService.clearCollection();
+    }
+
     @PostMapping("/search")
     @Operation(summary = "语义检索", description = "基于向量相似度检索知识库中最相关的 topK 条知识")
     public List<SearchHit> search(@RequestBody RagSearchRequest request) {
-        int topK = request.topK() == null ? 5 : request.topK();
-        return ragKnowledgeService.search(request.query(), topK);
+        int topK = request.topK() == null ? defaultTopK : request.topK();
+        double threshold = request.similarityThreshold() != null
+                ? request.similarityThreshold() : defaultSimilarityThreshold;
+        return ragKnowledgeService.search(request.query(), topK, threshold);
     }
 
     @GetMapping("/knowledge-base")

@@ -97,7 +97,7 @@ class RagKnowledgeServiceTest {
         Document doc = new Document("知识点", java.util.Map.of("source", "c.txt"));
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
 
-        var hits = service.search("关于知识点", 1);
+        var hits = service.search("关于知识点", 1, null);
         assertThat(hits).hasSize(1);
         assertThat(hits.get(0).content()).isEqualTo("知识点");
         assertThat(hits.get(0).metadata().get("source")).isEqualTo("c.txt");
@@ -109,5 +109,57 @@ class RagKnowledgeServiceTest {
         Files.writeString(file, "   \n  ", StandardCharsets.UTF_8);
         RagImportResult result = service.importDocument(file.toString());
         assertThat(result.chunks()).isZero();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void 真实新生手册状态机切片质量验证() throws Exception {
+        Path doc = Path.of("docs", "jmu新生手册.txt").toAbsolutePath().normalize();
+        if (!Files.exists(doc)) {
+            doc = Path.of("rag", "docs", "jmu新生手册.txt").toAbsolutePath().normalize();
+        }
+        assertThat(doc).exists();
+        ReflectionTestUtils.setField(service, "docsDir", doc.getParent().toString());
+
+        service.importDocument(doc.toString());
+        org.mockito.ArgumentCaptor<List<Document>> captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        org.mockito.Mockito.verify(vectorStore).add(captor.capture());
+        List<Document> docs = captor.getValue();
+
+        // 打印全部切片，供人工检查切片质量
+        StringBuilder dump = new StringBuilder();
+        dump.append("=== 新生手册状态机切片，共 ").append(docs.size()).append(" 块 ===\n");
+        for (int i = 0; i < docs.size(); i++) {
+            String text = docs.get(i).getText();
+            dump.append("\n---- 块").append(i).append(" (len=").append(text.length())
+                    .append(", index=").append(docs.get(i).getMetadata().get("chunk_index")).append(") ----\n");
+            dump.append(text).append("\n");
+        }
+        Files.writeString(Path.of("target", "新生手册切片_dump.txt"), dump.toString(), StandardCharsets.UTF_8);
+
+        // 断言1：切块非空
+        assertThat(docs).isNotEmpty();
+        String all = docs.stream().map(Document::getText).reduce("", String::concat);
+        // 断言2：不再包含校歌曲调简谱行（图2过滤）
+        assertThat(all).as("曲调行残留: " + all)
+                .doesNotContain("5. 5  5. 5  5.  | 3")
+                .doesNotContain("6. 6  2. 2  | 5  -")
+                .doesNotContain("6  5  | 3  1  | 2  5. 4  | 3. 2  1");
+        // 断言3：表格块完整保存（图3保整，含分隔行与表头）
+        assertThat(all).contains("收费标准一览表")
+                .contains("| 层次 | 专业 |")
+                .contains("| ---- | ---- |")
+                .contains("少数民族预科班")
+                .contains("8640");
+        // 断言4：不再有半句截断——"当事人将承担相应的法律责任"完整保留
+        assertThat(all).contains("当事人将承担相应的法律责任");
+        // 断言5：绝大多数块大小受控（500 + 标题前缀容忍，表格块除外）
+        for (Document d : docs) {
+            String t = d.getText();
+            if (t.contains("收费标准一览表") || t.contains("学费(元/年)")) {
+                continue; // 表格块允许更大
+            }
+            assertThat(t.length()).as("正文块超长: " + t).isLessThan(800);
+        }
     }
 }

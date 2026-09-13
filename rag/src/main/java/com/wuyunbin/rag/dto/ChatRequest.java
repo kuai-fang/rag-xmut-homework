@@ -26,7 +26,10 @@ public record ChatRequest(
         @Schema(description = "知识库检索条数，默认 5", example = "5")
         @Min(value = 1, message = "topK 必须在 1~20 之间")
         @Max(value = 20, message = "topK 必须在 1~20 之间")
-        Integer topK
+        Integer topK,
+
+        @Schema(description = "相似度阈值(0~1)，仅检索相似度不低于该值的片段；不传则不过滤", example = "0.65")
+        Double similarityThreshold
 ) {
 
     /** 是否启用 RAG（缺省视为 true）。*/
@@ -37,5 +40,10 @@ public record ChatRequest(
     /** topK 缺省值。*/
     public int resolvedTopK() {
         return topK == null || topK < 1 ? 5 : Math.min(topK, 20);
+    }
+
+    /** similarityThreshold 缺省值（无阈值）。*/
+    public Double resolvedSimilarityThreshold() {
+        return similarityThreshold;
     }
 }
